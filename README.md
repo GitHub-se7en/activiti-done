@@ -10,7 +10,8 @@ activiti请假案例完整版代码
 
 
 但是就是因为这一点，导致后面查询历史变量的时候出现问题，先看下面这个图
-![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/taskid-null.png）
+
+![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/taskid-null.png)
 
 这个是activiti的历史变量表，由于上面的操作，导致历史变量表里面taskid为null，这也导致了，查询某一个流程里面的task的变量是查询不到的，经过查询activiti的资料，activiti中的变量有三种作用域，一种是instance范围的，一种是task范围的，后来我把这个变量限制到task的时候，确实是有taskid了，但是下一个task根本取不到上一个task的值，而这是不能允许的，因为我需要上一个task的变量作为网关的判断条件
 
