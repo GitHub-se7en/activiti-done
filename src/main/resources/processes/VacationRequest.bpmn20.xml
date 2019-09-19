@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<definitions id="definitions"
+             targetNamespace="http://activiti.org/bpmn20"
+             xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:activiti="http://activiti.org/bpmn">
+
+    <process id="vacationRequest" name="Vacation request">
+
+        <!-- 这里直接在startEvent中就定义了变量，还有的例子中是通过重新定义一个userTask来实现的 -->
+        <!-- 这里还需要去掉startDate -->
+        <startEvent id="request" activiti:initiator="userId" name="start event" activiti:assignee="${userId}">
+            <extensionElements>
+                <activiti:formProperty id="departmentId" name="department id"/>
+                <activiti:formProperty id="vacationTypeId" name="vacation type id"/>
+                <activiti:formProperty id="startDate" name="First day of holiday (dd-MM-yyy)" datePattern="yyyy-MM-dd hh" type="date" required="true" />
+                <activiti:formProperty id="endDate" name="Last day of holiday (dd-MM-yyy)" datePattern="yyyy-MM-dd hh" type="date" required="true" />
+                <activiti:formProperty id="durationTime" name="Duration time" type="long" value="1" required="true"/>
+                <activiti:formProperty id="vacationMotivation" name="Motivation"  />
+                <activiti:formProperty id="backupUserId" name="backup user id"  />
+                <activiti:formProperty id="attachmentUrl" name="attachment url" />
+
+                <!-- 下面的并不是请假表单里面的东西，是下一级的审批人 -->
+                <activiti:formProperty id="manageId" name="manager id" type="string" />
+            </extensionElements>
+        </startEvent>
+
+        <!-- 每个事件之间是通过线来连接的 -->
+        <sequenceFlow id="flow1" sourceRef="request" targetRef="handleRequest" />
+
+        <!-- TODO 这里可能需要加网关进行判断，如果是审批人进行审批的时候会直接跳过下面的，连接到另外一个节点 -->
+
+
+        <userTask id="handleRequest" name="Department manage handle vacation request" >
+            <documentation>
+                { "userId" : "${userId}",
+                "departmentId" : "${departmentId}",
+                "vacationTypeId" : "${vacationTypeId}",
+                "startDate" : "${startDate}",
+                "endDate" : "${endDate}",
+                "durationTime" : "${durationTime}",
+                "vacationMotivation" : "${vacationMotivation}",
+                "backupUserId" : "${backupUserId}",
+                "attachmentUrl" : "${attachmentUrl}" }
+            </documentation>
+            <extensionElements>
+                <activiti:formProperty id="vacationApproved" name="Do you approve this vacation" type="enum" required="true">
+                    <activiti:value id="true" name="Approve" />
+                    <activiti:value id="false" name="Reject" />
+                </activiti:formProperty>
+                <activiti:formProperty id="managerMotivation" name="Motivation" type="string" />
+            </extensionElements>
+            <!-- 根据文档的描述，potentialOwner是角色，也可以指定人员，还有的例子中是使用assignee，这个是task的属性，不是子节点 -->
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <!-- 这里可以实现指定处理人是谁，也就是由谁来审批这一次申请 -->
+                    <!-- TODO 按照需求来说，第一级审批应该由部门主管来定 -->
+                    <formalExpression>${manageId}</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+        <sequenceFlow id="flow2" sourceRef="handleRequest" targetRef="managerRequestApprovedDecision" />
+
+        <exclusiveGateway id="managerRequestApprovedDecision" name="Request approved?" />
+
+        <sequenceFlow id="flow3" sourceRef="managerRequestApprovedDecision" targetRef="projectManagerHandleRequest">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'true'}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- 拒绝之后接着就是userTask -->
+        <sequenceFlow id="flow4" sourceRef="managerRequestApprovedDecision" targetRef="managerRejectRequestTask">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'false'}</conditionExpression>
+        </sequenceFlow>
+        <userTask id="managerRejectRequestTask" name="Manager reject request task">
+            <documentation>
+                你的领导拒绝了你申请 ${durationTime} 天的假期.
+                理由: ${managerMotivation}
+            </documentation>
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <formalExpression>${userId}</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+        <sequenceFlow id="flow5" sourceRef="managerRejectRequestTask" targetRef="theEnd" />
+
+        <!-- 这里新增加一级审批就是项目经历审批 -->
+        <userTask id="projectManagerHandleRequest" name="Project manager handle vacation request" >
+            <documentation>
+                { "userId" : "${userId}",
+                "departmentId" : "${departmentId}",
+                "vacationTypeId" : "${vacationTypeId}",
+                "startDate" : "${startDate}",
+                "endDate" : "${endDate}",
+                "durationTime" : "${durationTime}",
+                "vacationMotivation" : "${vacationMotivation}",
+                "backupUserId" : "${backupUserId}",
+                "attachmentUrl" : "${attachmentUrl}" }
+            </documentation>
+            <extensionElements>
+                <activiti:formProperty id="vacationApproved" name="Do you approve this vacation" type="enum" required="true">
+                    <activiti:value id="true" name="Approve" />
+                    <activiti:value id="false" name="Reject" />
+                </activiti:formProperty>
+                <activiti:formProperty id="projectManagerMotivation" name="Motivation" type="string" />
+            </extensionElements>
+            <!-- 根据文档的描述，potentialOwner是角色，也可以指定人员，还有的例子中是使用assignee，这个是task的属性，不是子节点 -->
+            <!-- 这里我并没有使用potentialOwner，而是使用的是humanPerformer，因为不是角色，而是只有一个人进行审批 -->
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <formalExpression>project manager</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+
+        <sequenceFlow id="flow6" sourceRef="projectManagerHandleRequest" targetRef="projectManagerRequestApprovedDecision"/>
+
+        <exclusiveGateway id="projectManagerRequestApprovedDecision" name="Request approved?" />
+
+        <!-- 如果项目经理不同意的话 -->
+        <sequenceFlow id="flow7" sourceRef="projectManagerRequestApprovedDecision" targetRef="projectManagerRejectRequestTask">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'false'}</conditionExpression>
+        </sequenceFlow>
+        <userTask id="projectManagerRejectRequestTask" name="Project manager reject request task">
+            <documentation>
+                你的领导拒绝了你申请 ${durationTime} 天的假期.
+                理由: ${projectManagerMotivation}
+            </documentation>
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <formalExpression>${userId}</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+        <sequenceFlow id="flow8" sourceRef="projectManagerRejectRequestTask" targetRef="theEnd" />
+
+        <!-- 这里应该还有一个天数判断，如果是天数大于3天并且项目经理同意之后才能走到总经理那边 -->
+        <sequenceFlow id="flow9" sourceRef="projectManagerRequestApprovedDecision" targetRef="chairmanHandleRequest">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'true'}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- 这里还需要新增加一级审批就是总经理审批 -->
+        <userTask id="chairmanHandleRequest" name="Chairman handle vacation request" >
+            <documentation>
+                { "userId" : "${userId}",
+                "departmentId" : "${departmentId}",
+                "vacationTypeId" : "${vacationTypeId}",
+                "startDate" : "${startDate}",
+                "endDate" : "${endDate}",
+                "durationTime" : "${durationTime}",
+                "vacationMotivation" : "${vacationMotivation}",
+                "backupUserId" : "${backupUserId}",
+                "attachmentUrl" : "${attachmentUrl}" }
+            </documentation>
+            <extensionElements>
+                <activiti:formProperty id="vacationApproved" name="Do you approve this vacation" type="enum" required="true">
+                    <activiti:value id="true" name="Approve" />
+                    <activiti:value id="false" name="Reject" />
+                </activiti:formProperty>
+                <activiti:formProperty id="chairmanMotivation" name="Motivation" type="string" />
+            </extensionElements>
+            <!-- 根据文档的描述，potentialOwner是角色，也可以指定人员，还有的例子中是使用assignee，这个是task的属性，不是子节点 -->
+            <!-- 这里我并没有使用potentialOwner，而是使用的是humanPerformer，因为不是角色，而是只有一个人进行审批 -->
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <formalExpression>Chairman</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+
+        <sequenceFlow id="flow10" sourceRef="chairmanHandleRequest" targetRef="chairmanRequestApprovedDecision"/>
+
+        <exclusiveGateway id="chairmanRequestApprovedDecision" name="Request approved?" />
+
+        <!-- 总经理如果同意的话，那就发送邮件通知申请人 -->
+        <sequenceFlow id="flow11" sourceRef="chairmanRequestApprovedDecision" targetRef="sendApprovalMail">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'true'}</conditionExpression>
+        </sequenceFlow>
+
+        <serviceTask id="sendApprovalMail" name="Send email confirmation"
+                     activiti:delegateExpression="${sendEmailServiceTask}">
+        </serviceTask>
+
+        <sequenceFlow id="flow12" sourceRef="sendApprovalMail" targetRef="theEnd" />
+
+        <!-- 如果拒绝的时候，走到下一个userTask -->
+        <sequenceFlow id="flow13" sourceRef="chairmanRequestApprovedDecision" targetRef="chairmanRejectTask">
+            <conditionExpression xsi:type="tFormalExpression">${vacationApproved == 'false'}</conditionExpression>
+        </sequenceFlow>
+
+        <userTask id="chairmanRejectTask" name="Chairman reject task">
+            <documentation>
+                你的领导拒绝了你申请 ${durationTime} 天的假期.
+                理由: ${chairmanMotivation}
+            </documentation>
+            <!-- 修改为拒绝之后不能重新修改，只能重新发起一次新的申请 -->
+            <!--<extensionElements>
+                <activiti:formProperty id="durationTime" name="Number of days" value="${durationTime}" type="long" required="true"/>
+                &lt;!&ndash;<activiti:formProperty id="startDate" name="First day of holiday (dd-MM-yyy)" value="${startDate}" datePattern="dd-MM-yyyy hh:mm" type="date" required="true" />&ndash;&gt;
+                <activiti:formProperty id="vacationMotivation" name="Motivation" value="${vacationMotivation}" type="string" />
+                <activiti:formProperty id="resendRequest" name="Resend vacation request to manager?" type="enum" required="true">
+                    <activiti:value id="true" name="Yes" />
+                    <activiti:value id="false" name="No" />
+                </activiti:formProperty>
+            </extensionElements>-->
+            <humanPerformer>
+                <resourceAssignmentExpression>
+                    <formalExpression>${userId}</formalExpression>
+                </resourceAssignmentExpression>
+            </humanPerformer>
+        </userTask>
+        <sequenceFlow id="flow14" sourceRef="chairmanRejectTask" targetRef="theEnd" />
+        <endEvent id="theEnd" name="The end"/>
+
+    </process>
+
+</definitions>
