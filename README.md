@@ -131,18 +131,21 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
 
 -------------这是一条华丽的分割线--------
 
-#### 流程状态的判断以及显示
-
-整个请假流程分为已经结束和正在进行，其中已经结束里面又区分了是请假通过还是请假拒绝，其中请假拒绝需要显示哪个节点请假拒绝的，
+#### 流程状态的判断以及显示    
 ![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/%E6%88%90%E5%9E%8B%E5%9B%BE.png)
-这个在技术上是这么实现的，ProcessInstance processInstance = processEngine.getRuntimeService()
-                 .createProcessInstanceQuery()
-                 .processInstanceId(instanceId)
-                 .singleResult();
-根据这个方法可以查询出来相关的流程实例，判断这个流程实例是否存在，如果存在的话，那就意味着流程正在执行，如果不存在的话，那就意味着流程已经结束，应该是流程表和历史表之间的区别，如果流程已经结束，我还需要判断出来究竟是同意了还是拒绝了，这个根据activiti的方法没有查询出来，我想过在整个流程图bpmn文件中动手脚，但是做不到，所以想到了一个折中的办法，那就是 在新增加的表里面通过查询每个节点同意与否的状态来实现判断整个的流程状态的判断，如果某一个节点的意见是拒绝的话，那就意味着整个的流程是拒绝状态，所以最终的结果实现就是拒绝的整个的流程状态是某个人拒绝了，但是同意的话，是没有显示某个人同意的
+整个请假流程分为已经结束和正在进行，其中已经结束里面又区分了是请假通过还是请假拒绝，其中请假拒绝需要显示哪个节点请假拒绝的，    
+这个在技术上是这么实现的，ProcessInstance processInstance = processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(instanceId).singleResult();       
+根据这个方法可以查询出来相关的流程实例，判断这个流程实例是否存在，如果存在的话，那就意味着流程正在执行，如果不存在的话，那就意味着流程已经结束，应该是流程表和历史表之间的区别。    
+如果流程已经结束，我还需要判断出来究竟是同意了还是拒绝了，这个根据activiti的方法没有查询出来，我想过在整个流程图bpmn文件中动手脚，但是做不到，所以想到了一个折中的办法，那就是 在新增加的表里面通过查询每个节点同意与否的状态来实现判断整个的流程状态的判断，如果某一个节点的意见是拒绝的话，那就意味着整个的流程是拒绝状态，所以最终的结果实现就是拒绝的整个的流程状态是某个人拒绝了，但是同意的话，是没有显示某个人同意的
 
-#### 流程状态的判断以及显示
+#### 下一个节点审批人
 
+![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/%E4%B8%8B%E4%B8%80%E8%8A%82%E7%82%B9%E5%AE%A1%E6%89%B9%E4%BA%BA.png) 
+
+下一节点的审批人，看起来是很简单的，但是实际操作起来是很复杂，因为查询的都是历史表里面的数据，这就意味着下一节点的数据是没有办法在历史表里面获取的，下一节点的审批人是在运行表里面，这就需要拼接数据才行。    
+技术采用：    
+List<Task> active = processEngine.getTaskService().createTaskQuery().processInstanceId(instanceId).active().list();    
+active的方法或获取目前正在运行的节点的数据
 
 
 
