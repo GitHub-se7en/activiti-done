@@ -102,6 +102,8 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
 整个请假流程分为已经结束和正在进行，其中已经结束里面又区分了是请假通过还是请假拒绝，其中请假拒绝需要显示哪个节点请假拒绝的，    
 这个在技术上是这么实现的，ProcessInstance processInstance = processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(instanceId).singleResult();       
 根据这个方法可以查询出来相关的流程实例，判断这个流程实例是否存在，如果存在的话，那就意味着流程正在执行，如果不存在的话，那就意味着流程已经结束，应该是流程表和历史表之间的区别。    
+    
+    
 如果流程已经结束，我还需要判断出来究竟是同意了还是拒绝了，这个根据activiti的方法没有查询出来，    
 我想过在整个流程图bpmn文件中动手脚，但是太乱了，    
 所以想到了一个折中的办法，    
