@@ -133,7 +133,9 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
 
 #### 流程状态的判断以及显示
 
-整个请假流程分为已经结束和正在进行，其中已经结束里面又区分了是请假通过还是请假拒绝，其中请假拒绝需要显示哪个节点请假拒绝的，TODO插入图片，这个在技术上是这么实现的，ProcessInstance processInstance = processEngine.getRuntimeService()
+整个请假流程分为已经结束和正在进行，其中已经结束里面又区分了是请假通过还是请假拒绝，其中请假拒绝需要显示哪个节点请假拒绝的，
+![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/%E6%88%90%E5%9E%8B%E5%9B%BE.png)
+这个在技术上是这么实现的，ProcessInstance processInstance = processEngine.getRuntimeService()
                  .createProcessInstanceQuery()
                  .processInstanceId(instanceId)
                  .singleResult();
