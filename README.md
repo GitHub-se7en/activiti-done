@@ -23,17 +23,16 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
 本来一开始我没有想建立中间表，但是权衡在activiti的表里面插入数据和在自己的表里面插入数据，果断选择了新建一张表，这张表里面只存储了同意与否，因为前段需要显示每个节点的审批人的意见，所以只存了这一个变量
 
 #### 难点二：处理数据
-下面的整套代码都是清洗数据的代码，大体过程是这样的，首先利用createHistoricActivityInstanceQuery()这个方法查询出这个流程的所有活动，记住活动和任务是不一样的，
+下面的整套代码都是清洗数据的代码，大体过程是这样的，首先利用createHistoricActivityInstanceQuery()这个方法查询出这个流程的所有活动，记住活动和任务是不一样的，活动是所有的，任务很少，只有关键的点
 
-由于节点中只有taskid，并没有任务详情，所以我使用这个方法createHistoricTaskInstanceQuery()查询出这个任务的详情是什么，为以后做准备，可能会用到这个
+由于节点中只有taskid，并没有任务详情，所以我使用这个方法createHistoricTaskInstanceQuery()查询出这个任务的详情是什么，为以后做准备，可能会用到这个    
 
+
+-----------------华丽的分割线-----------------------
+191112更新，删除了多余的代码，完整的代码在类里面可以找到，这里只是提一下思路
 
     @GetMapping("/user-get-one-process")
     public List<HistoricActivityInstance> userGetOneInstance(String instanceId) {
-        if (StringUtils.isEmpty(instanceId)) {
-            return null;
-        }
-
         List<HistoricActivityInstance> historicActivityInstance = processEngine.getHistoryService() // 历史任务Service
                 .createHistoricActivityInstanceQuery() // 创建历史活动实例查询
                 .processInstanceId(instanceId) // 指定流程实例id
@@ -42,36 +41,11 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
         List listInstance = new ArrayList();
         //查询出来的所有的节点没法直接返给前端，所以使用map进行处理一遍
         historicActivityInstance.forEach(l -> {
-            log.info("判断" + l.getActivityName() + "==" + "Request approved?");
-            Map<String, Object> map = new HashMap<>();
             if ("start event".equals(l.getActivityName())) {
-                String startEventProcessInstanceId = l.getProcessInstanceId();
-                User startUserId = activitiUserService.getStartUserId(startEventProcessInstanceId);
-                map.put("actionId", l.getId());
-                map.put("instanceId", l.getProcessInstanceId());
-                map.put("actionName", l.getActivityName());
-                map.put("assignee", startUserId.getId());
-                map.put("assigneeRealName", startUserId.getRealName());
-                map.put("startTime", l.getStartTime());
-                map.put("endTime", l.getEndTime());
-                map.put("taskId", l.getTaskId());
+                //这两步是筛选出需要显示到前端的活动，由于任务没有开始节点，所有的活动又不能都显示在前端，只能是这样处理
             }
             if (!"Request approved?".equals(l.getActivityName()) && !"start event".equals(l.getActivityName())) {
-                //一个map就是一个任务节点
-                map.put("actionId", l.getId());
-                map.put("instanceId", l.getProcessInstanceId());
-                map.put("actionName", l.getActivityName());
-                map.put("assignee", l.getAssignee());
-                if (l.getAssignee() != null) {
-                    if ("project manager".equals(l.getAssignee())) {
-                        map.put("assigneeRealName", "项目经理");
-                    } else if ("Chairman".equals(l.getAssignee())) {
-                        map.put("assigneeRealName", "总经理");
-                    } else {
-                        log.info(userMapper.selectByPrimaryKey(Long.valueOf(l.getAssignee())) + "");
-                        String realName = userMapper.selectByPrimaryKey(Long.valueOf(l.getAssignee())).getRealName();
-                        map.put("assigneeRealName", realName);
-                    }
+                
                 }
                 map.put("startTime", l.getStartTime());
                 map.put("endTime", l.getEndTime());
@@ -86,21 +60,13 @@ activiti请假，天数判断，审批人请假，查询历史流程，下一节
                             .taskId(l.getTaskId())
                             .singleResult();
                     map.put("taskIdDescription", historicTaskInstance.getDescription());
-                    map.put("taskIdDescriptionUserIdRealName", userMapper.selectByPrimaryKey(Long.valueOf((String) (JSON.parseObject(historicTaskInstance.getDescription()).get("userId")))).getRealName());
-                    map.put("taskIdDurationInMillis", historicTaskInstance.getDurationInMillis());
                     //根据流程id和任务id锁定这个任务是同意了还是拒绝了
-                    ActivitiUser ifApproved = activitiUserService.checkIfApproved(new ActivitiUser(null, l.getAssignee(), instanceId, l.getTaskId(), null));
+                    ActivitiUser ifApproved = activitiUserService.checkIfApproved();
                     map.put("taskIdIfApproved", ifApproved.getVacationApproved());
                 }
             }
-            if (map.size()!=0) {
-                listInstance.add(map);
-            }
         });
-        //1.创建运行服务对象
-        //2.创建查询流程实例
-        //3.获取流程实例ID
-        //4.查询是否存在进行中的流程
+        //1.创建运行服务对象//2.创建查询流程实例//3.获取流程实例ID//4.查询是否存在进行中的流程
         ProcessInstance processInstance = processEngine.getRuntimeService()
                 .createProcessInstanceQuery()
                 .processInstanceId(instanceId)
@@ -148,11 +114,13 @@ List<Task> active = processEngine.getTaskService().createTaskQuery().processInst
 active的方法或获取目前正在运行的节点的数据
 
 
+#### 查询经过我的流程和由我发起的流程
 
-
-
-
-
+从请假人的角度来看，我想看到由我发起的请假，，，从审批人的角度来看，我想看到我审批过的请假，这就意味着我需要记录流程的发起人以及经过这个节点的所有人，这个是利用第三张表实现的，    
+所有由我发起的请假：    
+![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/%E7%94%B1%E6%88%91%E5%8F%91%E8%B5%B7%E7%9A%84%E8%AF%B7%E5%81%87%E6%B5%81%E7%A8%8B.png)     
+所有经过我的请假：    
+![image](https://github.com/GitHub-se7en/activiti-done/blob/master/images/%E7%BB%8F%E8%BF%87%E6%88%91%E7%9A%84%E8%AF%B7%E5%81%87%E6%B5%81%E7%A8%8B.png)
 
 
 
